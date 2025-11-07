@@ -22,29 +22,29 @@ It works transparently for both **streaming** and **non-streaming** completions.
 
 ## 🧩 How it identifies reasoning continuity
 
-Each response is uniquely cached and matched back to the right assistant message through a safe two-step process:
+Each response is uniquely cached and matched back to the correct assistant message through a safe two-step process:
 
-1. **Response ID match:**
+1. **Response ID match**
    When possible, the model’s `response.id` (from the streamed JSON events) is bound to the assistant message that originated it.
    Subsequent requests use this ID to recover and re-inject the correct `reasoning_details`.
 
-2. **Content-level fallback:**
-   If a conversation branch is forked or a message ID changes, the extension falls back to a hash of the message **content + tool calls** to ensure stable mapping.
+2. **Content-level fallback**
+   If a conversation branch is forked or a message ID changes, the extension falls back to a hash of the message’s **content + tool calls** to ensure stable mapping.
 
 ---
 
 ### ✅ Safeguards
 
-* **Message chain starts**: Reasoning continuity begins purely from content — safe and deterministic.
-* **Ongoing conversations**: Reasoning data is preserved automatically across steps.
-* **Forked conversations**: If a user rewinds and edits a previous turn, mismatched reasoning data is ignored safely.
+* **Message chain starts:** reasoning continuity begins purely from content — safe and deterministic.
+* **Ongoing conversations:** reasoning data is preserved automatically across steps.
+* **Forked conversations:** if a user rewinds and edits a previous turn, mismatched reasoning data is ignored safely.
 
 ### ⚠️ Limitations
 
 This does **not** preserve reasoning continuity across:
 
 * Different browsers or devices
-* Reloaded TypingMind sessions (reasoning cache is in-memory only)
+* Reloaded TypingMind sessions (cache is in-memory only)
 * Edited or truncated message histories that no longer match ID or content hashes
 
 These constraints are deliberate to prevent reasoning corruption.
@@ -53,7 +53,7 @@ These constraints are deliberate to prevent reasoning corruption.
 
 ## ⚙️ Configuration
 
-At the top of `script.js`, there is an array named something like:
+At the top of `script.js`, you’ll find an array like:
 
 ```js
 const ALLOWED_ENDPOINTS = [
@@ -63,31 +63,39 @@ const ALLOWED_ENDPOINTS = [
 ```
 
 Only requests sent to these endpoints will be patched to preserve reasoning continuity.
-You can **add, remove, or change** entries in this array to match your setup (for example, if you self-host OpenRouter or use custom proxy URLs).
+You can **add, remove, or change** entries to match your own setup — for example, if you self-host OpenRouter or use a custom proxy.
 
 ---
 
 ## 🧪 Installation
 
-No manifest or bundling needed — it’s a single-file TypingMind extension.
+No manifest or bundling required — it’s a single-file TypingMind extension.
 
-1. Fork this repository and adjust any settings (e.g. endpoint list) as needed.
+1. **Fork this repository** and adjust the endpoint list if needed.
 
-2. Commit your changes, then open your fork on GitHub.
+2. Commit your edits, then choose one of the two supported hosting methods:
 
-3. Copy the **raw script URL** from your fork, e.g.:
+   ### Option 1 — via jsDelivr (recommended)
 
    ```
-   https://raw.githubusercontent.com/<your-username>/typingmind-reasoning-support/main/script.js
+   https://cdn.jsdelivr.net/gh/<your-username>/typingmind-reasoning-support@main/script.js
    ```
 
-4. In TypingMind:
+   ### Option 2 — via GitHub Gist
+
+   Create a Gist containing your `script.js`, then use its `.js` URL:
+
+   ```
+   https://gist.github.com/<your-gist-id>.js
+   ```
+
+3. In TypingMind:
 
    * Open **Settings → Extensions → Add Extension**
-   * Paste that raw URL
+   * Paste the URL of your hosted script
    * Click **Install**, then refresh the page
 
-You’ll see a console message confirming:
+When loaded successfully, you’ll see this in the console:
 
 ```
 ✅ Reasoning Continuity Extension active
@@ -107,9 +115,34 @@ Both **streamed** and **non-streamed** responses are supported via unified cachi
 
 ---
 
+## 🧰 Developer Tips
+
+You can enable debug output to inspect how the reasoning continuity cache behaves.
+Simply open your browser console and type:
+
+```js
+window.debugReasoning = true;
+```
+
+This enables detailed logs showing:
+
+* When reasoning chunks are captured (`reasoning_details` deltas)
+* When reasoning data is restored and merged into the next request
+* When cache entries are created, matched, or pruned
+
+Disable logging again by running:
+
+```js
+window.debugReasoning = false;
+```
+
+This feature is purely local and has no network or privacy implications — it’s only for development visibility.
+
+---
+
 ## 🤝 Attribution
 
-Built by [**Teja Sunku**](https://github.com/tejasunku)  with help from ChatGPT to improve TypingMind’s support for reasoning-capable models.
+Built by [**Teja Sunku**](https://github.com/tejasunku) and ChatGPT 5 to improve TypingMind’s support for reasoning-capable models.
 If you find it useful, please consider leaving a ⭐ on the repo.
 
 GitHub:
