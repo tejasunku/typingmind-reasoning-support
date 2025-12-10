@@ -161,6 +161,11 @@
         if (prevAssistant && model) {
           const prevId = prevAssistant.response_id;
           const compoundKey = makeCompoundKey(prevAssistant);
+          // Add this in your send() interceptor for debugging
+          console.log("🔍 Structural key debug:");
+          console.log("Prev assistant message:", prevAssistant);
+          console.log("Created compound key:", compoundKey);
+          console.log("Cached entries:", Array.from(reasoningCache.entries()));
 
           // Primary match: exact response id
           let cached = prevId ? reasoningCache.get(prevId) : null;
