@@ -23,18 +23,73 @@
     });
 
   /**************************************************************
-   * 2️⃣  Capture reasoning_details and reasoning from BOTH streaming & non-streaming responses
+   * 2️⃣  Intercept fetch for both outgoing requests and incoming responses
    **************************************************************/
   const origFetch = window.fetch;
   window.fetch = async (...args) => {
-    const [url, options] = args;
+    let [url, options] = args;
+    
+    // --- Handle OUTGOING requests (reasoning injection)
+    if (options?.body && ENDPOINTS_WITH_REASONING.some((ep) => url.includes(ep))) {
+      try {
+        const parsed = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+        if (parsed?.messages) {
+          const prevAssistant = [...parsed.messages].reverse().find((m) => m.role === "assistant");
+          const model = parsed.model;
+          
+          if (prevAssistant && model) {
+            const prevId = prevAssistant.response_id;
+            const compoundKey = makeCompoundKey(prevAssistant);
+            
+            // Primary match: exact response id
+            let cached = prevId ? reasoningCache.get(prevId) : null;
+            
+            // Fallback match: same model + identical structure
+            if (!cached) {
+              for (const entry of reasoningCache.values()) {
+                if (entry.model === model && entry.structuralKey === compoundKey) {
+                  cached = entry;
+                  break;
+                }
+              }
+            }
+            
+            if (cached) {
+              // Inject reasoning_details if present
+              if (cached?.reasoning_details?.length) {
+                prevAssistant.reasoning_details = cached.reasoning_details;
+              }
+              
+              // Inject reasoning if present
+              if (cached?.reasoning) {
+                prevAssistant.reasoning = cached.reasoning;
+              }
+              
+              console.log(
+                `🧩 Injected reasoning for model ${model}`,
+                cached.reasoning_details?.length ? `(${cached.reasoning_details.length} details)` : "",
+                cached.reasoning ? `+ ${cached.reasoning.length} chars reasoning` : ""
+              );
+            }
+          }
+          
+          // Update the request body
+          options = { ...options, body: JSON.stringify(parsed) };
+        }
+      } catch (err) {
+        console.warn("Fetch reasoning inject error:", err);
+      }
+    }
+    
+    // --- Make the actual request
+    const resp = await origFetch.call(window, url, options);
+    
+    // --- Handle INCOMING responses (reasoning capture)
     if (!ENDPOINTS_WITH_REASONING.some((ep) => url.includes(ep))) {
-      return origFetch(...args);
+      return resp;
     }
 
-    const resp = await origFetch(...args);
-
-    // --- Case A: Streaming response (event-stream / chunked)
+    // Case A: Streaming response (event-stream / chunked)
     if (resp.headers.get("content-type")?.includes("event-stream")) {
       const reader = resp.body.getReader();
       const stream = new ReadableStream({
@@ -111,7 +166,7 @@
       return new Response(stream, { headers: resp.headers });
     }
 
-    // --- Case B: Non-streaming response (JSON body)
+    // Case B: Non-streaming response (JSON body)
     try {
       const clone = resp.clone();
       const json = await clone.json();
@@ -148,7 +203,7 @@
   };
 
   /**************************************************************
-   * 3️⃣  Inject reasoning_details and reasoning into next outgoing request
+   * 3️⃣  Keep XMLHttpRequest interceptor for compatibility
    **************************************************************/
   const origSend = XMLHttpRequest.prototype.send;
   XMLHttpRequest.prototype.send = function (body) {
@@ -161,16 +216,11 @@
         if (prevAssistant && model) {
           const prevId = prevAssistant.response_id;
           const compoundKey = makeCompoundKey(prevAssistant);
-          // Add this in your send() interceptor for debugging
-          console.log("🔍 Structural key debug:");
-          console.log("Prev assistant message:", prevAssistant);
-          console.log("Created compound key:", compoundKey);
-          console.log("Cached entries:", Array.from(reasoningCache.entries()));
 
           // Primary match: exact response id
           let cached = prevId ? reasoningCache.get(prevId) : null;
 
-          // Fallback match: same id + identical structure
+          // Fallback match: same model + identical structure
           if (!cached) {
             for (const entry of reasoningCache.values()) {
               if (entry.model === model && entry.structuralKey === compoundKey) {
@@ -186,13 +236,13 @@
               prevAssistant.reasoning_details = cached.reasoning_details;
             }
             
-            // Inject reasoning if present (same logic as reasoning_content)
+            // Inject reasoning if present
             if (cached?.reasoning) {
               prevAssistant.reasoning = cached.reasoning;
             }
             
             console.log(
-              `🧩 Injected reasoning for model ${model}`,
+              `🧩 Injected reasoning (XHR) for model ${model}`,
               cached.reasoning_details?.length ? `(${cached.reasoning_details.length} details)` : "",
               cached.reasoning ? `+ ${cached.reasoning.length} chars reasoning` : ""
             );
@@ -217,5 +267,5 @@
   /**************************************************************
    * 4️⃣  Done
    **************************************************************/
-  console.log("✅ Reasoning Continuity Extension (stream + non-stream) active");
+  console.log("✅ Reasoning Continuity Extension (fetch + XHR) active");
 })();
