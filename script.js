@@ -1,6 +1,15 @@
+// Clean up first
+if (window.__reasoningExtensionActive) {
+    if (window.__originalFetch) window.fetch = window.__originalFetch;
+    delete window.__reasoningExtensionActive;
+}
+
+window.__originalFetch = window.fetch;
+window.__reasoningExtensionActive = true;
+
 (() => {
     console.log("🧠 Debug Streaming Extension active");
-    const DEBUG_MODE = false;
+    const DEBUG_MODE = true;
     
     const ENDPOINTS_WITH_REASONING = [
         "https://openrouter.ai/api/v1/chat/completions",
